@@ -90,7 +90,8 @@
 					<minimizeJar>false</minimizeJar>
 					<filters>
                                                 <filter>
-                                                        <artifact>mysql-connector-java</artifact>
+                                                        <!-- FIX: правильный координаты драйвера -->
+                                                        <artifact>com.mysql:mysql-connector-j</artifact>
                                                         <includes>
                                                                 <include>**</include>
                                                         </includes>
@@ -286,6 +287,15 @@
                         <version>42.7.4</version>
                         <scope>runtime</scope>
                 </dependency>
+
+                <!-- ADD: MySQL Driver -->
+                <dependency>
+                        <groupId>com.mysql</groupId>
+                        <artifactId>mysql-connector-j</artifactId>
+                        <version>8.4.0</version>
+                        <scope>runtime</scope>
+                </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
@@ -649,4 +659,5 @@
 			</build>
 		</profile>
 	</profiles>
+
 </project>
