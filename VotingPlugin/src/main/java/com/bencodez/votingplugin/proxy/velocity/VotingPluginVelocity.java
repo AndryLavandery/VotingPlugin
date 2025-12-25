@@ -740,10 +740,11 @@ public class VotingPluginVelocity {
 				return new MysqlConfigVelocity("NonVotedCache", config);
 			}
 
-			@Override
-			public MysqlConfig getVoteLoggingMySQLConfig() {
-				return new MysqlConfigVelocity("VoteLogging", config);
-			}
+                        @Override
+                        public MysqlConfig getVoteLoggingMySQLConfig() {
+                                config.getVoteLoggingDatabaseNode();
+                                return new MysqlConfigVelocity("VoteLogging", config);
+                        }
 
 			@Override
 			public void loadTaskTimer(Runnable runnable, long delaySeconds, long repeatSeconds) {

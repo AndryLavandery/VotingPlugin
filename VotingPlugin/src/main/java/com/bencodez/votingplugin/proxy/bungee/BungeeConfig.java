@@ -23,6 +23,9 @@ public class BungeeConfig implements VotingPluginProxyConfig {
 
         private static final String DATABASE_SECTION = "Database";
         private static final String DATABASE_TYPE_PATH = DATABASE_SECTION + ".Type";
+        private static final String[] DATABASE_KEYS = { "Host", "Port", "Database", "Username", "Password", "MaxConnections", "Name",
+                        "Prefix", "DbType", "Driver", "UseSSL", "PublicKeyRetrieval", "UseMariaDB", "MaxLifeTime", "MinimumIdle",
+                        "IdleTimeoutMs", "KeepaliveMs", "ValidationMs", "LeakDetectMs", "ConnectionTimeout", "Line", "PoolName" };
 
         public BungeeConfig(VotingPluginBungee bungee) {
                 this.bungee = bungee;
@@ -58,15 +61,35 @@ public class BungeeConfig implements VotingPluginProxyConfig {
                         selected = getData();
                 }
 
-                String[] keys = { "Host", "Port", "Database", "Username", "Password", "MaxConnections", "Name", "Prefix",
-                                "DbType", "Driver", "UseSSL", "PublicKeyRetrieval", "UseMariaDB", "MaxLifeTime",
-                                "MinimumIdle", "IdleTimeoutMs", "KeepaliveMs", "ValidationMs", "LeakDetectMs",
-                                "ConnectionTimeout", "Line", "PoolName" };
-
-                for (String key : keys) {
+                for (String key : DATABASE_KEYS) {
                         Object value = selected.get(key, getDefaultDatabaseValue(key, type));
                         data.set(key, value);
                 }
+        }
+
+        public Configuration getVoteLoggingDatabaseSection() {
+                Configuration voteLogging = getData().getSection("VoteLogging");
+                if (voteLogging == null) {
+                        return null;
+                }
+
+                Configuration databaseSection = voteLogging.getSection("Database");
+                if (databaseSection == null) {
+                        return voteLogging;
+                }
+
+                String type = databaseSection.getString("Type",
+                                databaseSection.getString("DbType", getData().getString(DATABASE_TYPE_PATH, "MYSQL")));
+                Configuration selected = type.equalsIgnoreCase("postgresql") ? databaseSection.getSection("PostgreSQL")
+                                : databaseSection.getSection("MySQL");
+
+                for (String key : DATABASE_KEYS) {
+                        Object value = (selected != null) ? selected.get(key, getDefaultDatabaseValue(key, type))
+                                        : databaseSection.get(key, getDefaultDatabaseValue(key, type));
+                        voteLogging.set(key, value);
+                }
+
+                return voteLogging;
         }
 
 	public Map<String, Object> configToMap(Configuration config) {

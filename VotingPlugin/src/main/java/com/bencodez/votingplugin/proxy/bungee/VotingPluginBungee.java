@@ -637,10 +637,10 @@ public class VotingPluginBungee extends Plugin implements Listener {
 				return new MysqlConfigBungee(config.getData().getSection("NonVotedCache"));
 			}
 
-			@Override
-			public MysqlConfig getVoteLoggingMySQLConfig() {
-				return new MysqlConfigBungee(config.getData().getSection("VoteLogging"));
-			}
+                        @Override
+                        public MysqlConfig getVoteLoggingMySQLConfig() {
+                                return new MysqlConfigBungee(config.getVoteLoggingDatabaseSection());
+                        }
 
 			@Override
 			public void loadTaskTimer(Runnable runnable, long delaySeconds, long repeatSeconds) {

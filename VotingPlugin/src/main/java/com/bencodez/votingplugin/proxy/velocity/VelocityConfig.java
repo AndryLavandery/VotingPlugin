@@ -21,6 +21,9 @@ public class VelocityConfig extends VelocityYMLFile implements VotingPluginProxy
         }
 
         private static final String DATABASE_SECTION = "Database";
+        private static final String[] DATABASE_KEYS = { "Host", "Port", "Database", "Username", "Password", "MaxConnections", "Name",
+                        "Prefix", "DbType", "Driver", "UseSSL", "PublicKeyRetrieval", "UseMariaDB", "MaxLifeTime", "MinimumIdle",
+                        "IdleTimeoutMs", "KeepaliveMs", "ValidationMs", "LeakDetectMs", "ConnectionTimeout", "Line", "PoolName" };
 
         public String getDatabaseType() {
                 return getString(getNode(DATABASE_SECTION, "Type"), getString(getNode("DbType"), "MYSQL"));
@@ -41,12 +44,7 @@ public class VelocityConfig extends VelocityYMLFile implements VotingPluginProxy
                         selected = getNode("");
                 }
 
-                String[] keys = { "Host", "Port", "Database", "Username", "Password", "MaxConnections", "Name", "Prefix",
-                                "DbType", "Driver", "UseSSL", "PublicKeyRetrieval", "UseMariaDB", "MaxLifeTime",
-                                "MinimumIdle", "IdleTimeoutMs", "KeepaliveMs", "ValidationMs", "LeakDetectMs",
-                                "ConnectionTimeout", "Line", "PoolName" };
-
-                for (String key : keys) {
+                for (String key : DATABASE_KEYS) {
                         ConfigurationNode sourceNode = selected.getNode(key);
                         Object defaultValue = getDefaultDatabaseValue(type, key);
                         if (defaultValue == null) {
@@ -55,6 +53,33 @@ public class VelocityConfig extends VelocityYMLFile implements VotingPluginProxy
                         Object value = sourceNode.isVirtual() ? defaultValue : sourceNode.getValue();
                         getNode(key).setValue(value);
                 }
+        }
+
+        public ConfigurationNode getVoteLoggingDatabaseNode() {
+                ConfigurationNode voteLogging = getNode("VoteLogging");
+                ConfigurationNode dbNode = voteLogging.getNode("Database");
+                if (dbNode == null || dbNode.isVirtual()) {
+                        return voteLogging;
+                }
+
+                String type = getString(dbNode.getNode("Type"), getString(dbNode.getNode("DbType"), getDatabaseType()));
+                ConfigurationNode selected = type.equalsIgnoreCase("postgresql") ? dbNode.getNode("PostgreSQL")
+                                : dbNode.getNode("MySQL");
+                if (selected == null || selected.isVirtual()) {
+                        selected = dbNode;
+                }
+
+                for (String key : DATABASE_KEYS) {
+                        ConfigurationNode sourceNode = selected.getNode(key);
+                        Object defaultValue = getDefaultDatabaseValue(type, key);
+                        if (defaultValue == null) {
+                                defaultValue = dbNode.getNode(key).getValue();
+                        }
+                        Object value = sourceNode.isVirtual() ? defaultValue : sourceNode.getValue();
+                        voteLogging.getNode(key).setValue(value);
+                }
+
+                return voteLogging;
         }
 
         private Object getDefaultDatabaseValue(String type, String key) {
