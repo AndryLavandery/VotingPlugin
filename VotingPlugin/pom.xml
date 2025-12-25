@@ -89,13 +89,19 @@
 					<shadedArtifactAttached>false</shadedArtifactAttached>
 					<minimizeJar>false</minimizeJar>
 					<filters>
-						<filter>
-							<artifact>mysql-connector-java</artifact>
-							<includes>
-								<include>**</include>
-							</includes>
-						</filter>
-					    <filter>
+                                                <filter>
+                                                        <artifact>mysql-connector-java</artifact>
+                                                        <includes>
+                                                                <include>**</include>
+                                                        </includes>
+                                                </filter>
+                                                <filter>
+                                                        <artifact>org.postgresql:postgresql</artifact>
+                                                        <includes>
+                                                                <include>**</include>
+                                                        </includes>
+                                                </filter>
+                                            <filter>
                             <artifact>*:*</artifact>
                               <excludes>
                                  <exclude>META-INF/*.SF</exclude>
@@ -268,12 +274,18 @@
 			<version>2.11.6</version>
 			<scope>provided</scope>
 		</dependency>
-		<dependency>
-			<groupId>com.bencodez</groupId>
-			<artifactId>advancedcore</artifactId>
-			<version>3.7.20-SNAPSHOT</version>
-			<scope>compile</scope>
-		</dependency>
+                <dependency>
+                        <groupId>com.bencodez</groupId>
+                        <artifactId>advancedcore</artifactId>
+                        <version>3.7.20-SNAPSHOT</version>
+                        <scope>compile</scope>
+                </dependency>
+                <dependency>
+                        <groupId>org.postgresql</groupId>
+                        <artifactId>postgresql</artifactId>
+                        <version>42.7.4</version>
+                        <scope>runtime</scope>
+                </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
