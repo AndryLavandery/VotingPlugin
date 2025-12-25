@@ -480,10 +480,11 @@ public class VotingPluginVelocity {
 			}
 		}
 
-		config = new VelocityConfig(configFile);
-		String[] channel = config.getPluginMessageChannel().split(":");
-		CHANNEL = MinecraftChannelIdentifier.create(channel[0].toLowerCase(), channel[1].toLowerCase());
-		server.getChannelRegistrar().register(CHANNEL);
+                config = new VelocityConfig(configFile);
+                config.applyDatabaseSelection();
+                String[] channel = config.getPluginMessageChannel().split(":");
+                CHANNEL = MinecraftChannelIdentifier.create(channel[0].toLowerCase(), channel[1].toLowerCase());
+                server.getChannelRegistrar().register(CHANNEL);
 
 		CommandMeta meta = server.getCommandManager().metaBuilder("votingpluginbungee")
 				// Specify other aliases (optional)
@@ -892,12 +893,13 @@ public class VotingPluginVelocity {
 		getVotingPluginProxy().sendServerNameMessage();
 	}
 
-	public void reloadPlugin(boolean loadMysql) {
-		config.reload();
-		if (loadMysql) {
-			try {
-				if (!config.getString(config.getNode("Host"), "").isEmpty()) {
-					loadMysql();
+        public void reloadPlugin(boolean loadMysql) {
+                config.reload();
+                config.applyDatabaseSelection();
+                if (loadMysql) {
+                        try {
+                                if (!config.getString(config.getNode("Host"), "").isEmpty()) {
+                                        loadMysql();
 				} else {
 					logger.error("MySQL settings not set in bungeeconfig.yml");
 				}
