@@ -16,9 +16,59 @@ import ninja.leaping.configurate.ConfigurationNode;
 
 public class VelocityConfig extends VelocityYMLFile implements VotingPluginProxyConfig {
 
-	public VelocityConfig(File file) {
-		super(file);
-	}
+        public VelocityConfig(File file) {
+                super(file);
+        }
+
+        private static final String DATABASE_SECTION = "Database";
+
+        public String getDatabaseType() {
+                return getString(getNode(DATABASE_SECTION, "Type"), getString(getNode("DbType"), "MYSQL"));
+        }
+
+        private ConfigurationNode getSelectedDatabaseNode() {
+                String type = getDatabaseType();
+                if (type.equalsIgnoreCase("postgresql")) {
+                        return getNode(DATABASE_SECTION, "PostgreSQL");
+                }
+                return getNode(DATABASE_SECTION, "MySQL");
+        }
+
+        public void applyDatabaseSelection() {
+                String type = getDatabaseType();
+                ConfigurationNode selected = getSelectedDatabaseNode();
+                if (selected == null || selected.isVirtual()) {
+                        selected = getNode("");
+                }
+
+                String[] keys = { "Host", "Port", "Database", "Username", "Password", "MaxConnections", "Name", "Prefix",
+                                "DbType", "Driver", "UseSSL", "PublicKeyRetrieval", "UseMariaDB", "MaxLifeTime",
+                                "MinimumIdle", "IdleTimeoutMs", "KeepaliveMs", "ValidationMs", "LeakDetectMs",
+                                "ConnectionTimeout", "Line", "PoolName" };
+
+                for (String key : keys) {
+                        ConfigurationNode sourceNode = selected.getNode(key);
+                        Object defaultValue = getDefaultDatabaseValue(type, key);
+                        if (defaultValue == null) {
+                                defaultValue = getNode(key).getValue();
+                        }
+                        Object value = sourceNode.isVirtual() ? defaultValue : sourceNode.getValue();
+                        getNode(key).setValue(value);
+                }
+        }
+
+        private Object getDefaultDatabaseValue(String type, String key) {
+                if (key.equalsIgnoreCase("Port")) {
+                        return type.equalsIgnoreCase("postgresql") ? 5432 : 3306;
+                }
+                if (key.equalsIgnoreCase("MaxConnections")) {
+                        return 1;
+                }
+                if (key.equalsIgnoreCase("DbType")) {
+                        return type.equalsIgnoreCase("postgresql") ? "POSTGRESQL" : "MYSQL";
+                }
+                return null;
+        }
 
 	@Override
 	public boolean getAllowUnJoined() {

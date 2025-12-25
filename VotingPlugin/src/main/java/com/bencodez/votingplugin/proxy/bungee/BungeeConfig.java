@@ -17,13 +17,57 @@ import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
 
 public class BungeeConfig implements VotingPluginProxyConfig {
-	private VotingPluginBungee bungee;
-	@Getter
-	private Configuration data;
+        private VotingPluginBungee bungee;
+        @Getter
+        private Configuration data;
 
-	public BungeeConfig(VotingPluginBungee bungee) {
-		this.bungee = bungee;
-	}
+        private static final String DATABASE_SECTION = "Database";
+        private static final String DATABASE_TYPE_PATH = DATABASE_SECTION + ".Type";
+
+        public BungeeConfig(VotingPluginBungee bungee) {
+                this.bungee = bungee;
+        }
+
+        private String getSelectedDatabaseType() {
+                return getData().getString(DATABASE_TYPE_PATH, getData().getString("DbType", "MYSQL"));
+        }
+
+        private Configuration getSelectedDatabaseSection() {
+                String type = getSelectedDatabaseType();
+                if (type.equalsIgnoreCase("postgresql")) {
+                        return getData().getSection(DATABASE_SECTION + ".PostgreSQL");
+                }
+                return getData().getSection(DATABASE_SECTION + ".MySQL");
+        }
+
+        private Object getDefaultDatabaseValue(String key, String type) {
+                if (key.equalsIgnoreCase("Port")) {
+                        return type.equalsIgnoreCase("postgresql") ? 5432 : 3306;
+                }
+                if (key.equalsIgnoreCase("MaxConnections")) {
+                        return 1;
+                }
+                if (key.equalsIgnoreCase("DbType")) {
+                        return type.equalsIgnoreCase("postgresql") ? "POSTGRESQL" : "MYSQL";
+                }
+                return getData().get(key);
+        }
+
+        private void applyDatabaseSelection(Configuration selected, String type) {
+                if (selected == null) {
+                        selected = getData();
+                }
+
+                String[] keys = { "Host", "Port", "Database", "Username", "Password", "MaxConnections", "Name", "Prefix",
+                                "DbType", "Driver", "UseSSL", "PublicKeyRetrieval", "UseMariaDB", "MaxLifeTime",
+                                "MinimumIdle", "IdleTimeoutMs", "KeepaliveMs", "ValidationMs", "LeakDetectMs",
+                                "ConnectionTimeout", "Line", "PoolName" };
+
+                for (String key : keys) {
+                        Object value = selected.get(key, getDefaultDatabaseValue(key, type));
+                        data.set(key, value);
+                }
+        }
 
 	public Map<String, Object> configToMap(Configuration config) {
 		Map<String, Object> map = new HashMap<>();
@@ -352,13 +396,15 @@ public class BungeeConfig implements VotingPluginProxyConfig {
 				e.printStackTrace();
 			}
 		}
-		try {
-			data = ConfigurationProvider.getProvider(YamlConfiguration.class)
-					.load(new File(bungee.getDataFolder(), "bungeeconfig.yml"));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+                try {
+                        data = ConfigurationProvider.getProvider(YamlConfiguration.class)
+                                        .load(new File(bungee.getDataFolder(), "bungeeconfig.yml"));
+                } catch (IOException e) {
+                        e.printStackTrace();
+                }
+
+                applyDatabaseSelection(getSelectedDatabaseSection(), getSelectedDatabaseType());
+        }
 
 	public void save() {
 		try {
