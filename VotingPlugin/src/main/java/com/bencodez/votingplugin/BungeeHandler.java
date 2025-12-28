@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -32,6 +33,7 @@ import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler.MessageHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttServerComm;
 import com.bencodez.simpleapi.servercomm.mysql.BackendMessenger;
+import com.bencodez.simpleapi.servercomm.postgresql.PostgresBackendMessenger;
 import com.bencodez.simpleapi.servercomm.pluginmessage.PluginMessageHandler;
 import com.bencodez.simpleapi.servercomm.redis.RedisHandler;
 import com.bencodez.simpleapi.servercomm.redis.RedisListener;
@@ -40,7 +42,9 @@ import com.bencodez.simpleapi.servercomm.sockets.SocketHandler;
 import com.bencodez.simpleapi.servercomm.sockets.SocketReceiver;
 import com.bencodez.simpleapi.sql.data.DataValue;
 import com.bencodez.simpleapi.sql.data.DataValueBoolean;
+import com.bencodez.simpleapi.sql.mysql.DbType;
 import com.bencodez.simpleapi.sql.mysql.config.MysqlConfigSpigot;
+import com.bencodez.simpleapi.sql.postgresql.config.PostgresConfigSpigot;
 import com.bencodez.votingplugin.objects.VoteSite;
 import com.bencodez.votingplugin.proxy.BungeeMessageData;
 import com.bencodez.votingplugin.proxy.BungeeMethod;
@@ -82,8 +86,11 @@ public class BungeeHandler implements Listener {
 
 	private Thread redisThread;
 
-	@Getter
-	private BackendMessenger backendMysqlMessenger;
+        @Getter
+        private BackendMessenger backendMysqlMessenger;
+
+        @Getter
+        private PostgresBackendMessenger backendPostgresMessenger;
 
 	public BungeeHandler(VotingPluginMain plugin) {
 		this.plugin = plugin;
@@ -171,10 +178,14 @@ public class BungeeHandler implements Listener {
 		return Boolean.valueOf(data.getString());
 	}
 
-	public void close() {
-		if (backendMysqlMessenger != null) {
-			backendMysqlMessenger.shutdown();
-		}
+        public void close() {
+                if (backendMysqlMessenger != null) {
+                        backendMysqlMessenger.shutdown();
+                }
+
+                if (backendPostgresMessenger != null) {
+                        backendPostgresMessenger.shutdown();
+                }
 
 		if (socketHandler != null) {
 			socketHandler.closeConnection();
@@ -202,14 +213,20 @@ public class BungeeHandler implements Listener {
 
 			@Override
 			public void sendMessage(String subChannel, String... messageData) {
-				if (method.equals(BungeeMethod.MYSQL)) {
-					// plugin.getPluginMessaging().sendPluginMessage(subChannel, messageData);
+                                if (method.equals(BungeeMethod.MYSQL)) {
+                                        // plugin.getPluginMessaging().sendPluginMessage(subChannel, messageData);
 
-					try {
-						backendMysqlMessenger.sendToProxy(subChannel + "%l%" + String.join("%l%", messageData));
-					} catch (SQLException e) {
-						e.printStackTrace();
-					}
+                                        try {
+                                                if (backendPostgresMessenger != null) {
+                                                        backendPostgresMessenger.sendToProxy(
+                                                                        subChannel + "%l%" + String.join("%l%", messageData));
+                                                } else if (backendMysqlMessenger != null) {
+                                                        backendMysqlMessenger.sendToProxy(
+                                                                        subChannel + "%l%" + String.join("%l%", messageData));
+                                                }
+                                        } catch (SQLException e) {
+                                                e.printStackTrace();
+                                        }
 
 				} else if (method.equals(BungeeMethod.PLUGINMESSAGING)) {
 					plugin.getPluginMessaging().sendPluginMessage(subChannel, messageData);
@@ -548,28 +565,47 @@ public class BungeeHandler implements Listener {
 			}
 		});
 
-		if (method.equals(BungeeMethod.MYSQL)) {
-			plugin.registerBungeeChannels(plugin.getBungeeSettings().getPluginMessagingChannel());
+                if (method.equals(BungeeMethod.MYSQL)) {
+                        plugin.registerBungeeChannels(plugin.getBungeeSettings().getPluginMessagingChannel());
 
-			try {
-				backendMysqlMessenger = new BackendMessenger("VotingPlugin",
-						plugin.getMysql().getMysql().getConnectionManager().getDataSource(),
-						plugin.getOptions().getServer(), msg -> {
-							plugin.debug("Proxy sent: " + msg.payload);
+                        try {
+                                DbType dbType = plugin.getMysql().getMysql().getConnectionManager().getDbType();
+                                if (dbType == DbType.POSTGRESQL) {
+                                        backendPostgresMessenger = new PostgresBackendMessenger("VotingPlugin",
+                                                        plugin.getMysql().getMysql().getConnectionManager().getDataSource(),
+                                                        plugin.getOptions().getServer(), msg -> {
+                                                                plugin.debug("Proxy sent: " + msg.payload);
 
-							String[] message = msg.payload.split(Pattern.quote("%l%"));
-							if (message.length > 0) {
-								ArrayList<String> list = new ArrayList<>();
-								for (int i = 1; i < message.length; i++) {
-									list.add(message[i]);
-								}
-								globalMessageHandler.onMessage(message[0], list);
-							}
+                                                                String[] message = msg.payload.split(Pattern.quote("%l%"));
+                                                                if (message.length > 0) {
+                                                                        ArrayList<String> list = new ArrayList<>();
+                                                                        for (int i = 1; i < message.length; i++) {
+                                                                                list.add(message[i]);
+                                                                        }
+                                                                        globalMessageHandler.onMessage(message[0], list);
+                                                                }
 
-						});
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
+                                                        });
+                                } else {
+                                        backendMysqlMessenger = new BackendMessenger("VotingPlugin",
+                                                        plugin.getMysql().getMysql().getConnectionManager().getDataSource(),
+                                                        plugin.getOptions().getServer(), msg -> {
+                                                                plugin.debug("Proxy sent: " + msg.payload);
+
+                                                                String[] message = msg.payload.split(Pattern.quote("%l%"));
+                                                                if (message.length > 0) {
+                                                                        ArrayList<String> list = new ArrayList<>();
+                                                                        for (int i = 1; i < message.length; i++) {
+                                                                                list.add(message[i]);
+                                                                        }
+                                                                        globalMessageHandler.onMessage(message[0], list);
+                                                                }
+
+                                                        });
+                                }
+                        } catch (SQLException e) {
+                                e.printStackTrace();
+                        }
 
 		} else if (method.equals(BungeeMethod.REDIS)) {
 			redisHandler = new RedisHandler(plugin.getBungeeSettings().getRedisHost(),
@@ -696,10 +732,10 @@ public class BungeeHandler implements Listener {
 	@Getter
 	private MqttHandler mqttHandler;
 
-	public void loadGlobalMysql() {
-		if (plugin.getBungeeSettings().isGloblalDataEnabled()) {
-			if (timer != null) {
-				timer.shutdown();
+        public void loadGlobalMysql() {
+                if (plugin.getBungeeSettings().isGloblalDataEnabled()) {
+                        if (timer != null) {
+                                timer.shutdown();
 				try {
 					timer.awaitTermination(5, TimeUnit.SECONDS);
 				} catch (InterruptedException e) {
@@ -756,10 +792,11 @@ public class BungeeHandler implements Listener {
 								plugin.getLogger().warning(text);
 							}
 						});
-			} else {
-				globalDataHandler = new GlobalDataHandler(
-						new GlobalMySQL("VotingPlugin_GlobalData", new MysqlConfigSpigot(
-								plugin.getBungeeSettings().getData().getConfigurationSection("GlobalData"))) {
+                        } else {
+                                globalDataHandler = new GlobalDataHandler(
+                                                new GlobalMySQL("VotingPlugin_GlobalData",
+                                                                buildGlobalDataConfig(plugin.getBungeeSettings().getData()
+                                                                                .getConfigurationSection("GlobalData"))) {
 
 							@Override
 							public void debugEx(Exception e) {
@@ -793,11 +830,21 @@ public class BungeeHandler implements Listener {
 			globalDataHandler.getGlobalMysql().alterColumnType("DAY", "VARCHAR(5)");
 			globalDataHandler.getGlobalMysql().alterColumnType("FinishedProcessing", "VARCHAR(5)");
 			globalDataHandler.getGlobalMysql().alterColumnType("Processing", "VARCHAR(5)");
-			globalDataHandler.getGlobalMysql().alterColumnType("LastUpdated", "MEDIUMTEXT");
-			globalDataHandler.getGlobalMysql().alterColumnType("ForceUpdate", "VARCHAR(5)");
-			plugin.getTimeChecker().setProcessingEnabled(false);
-		}
-	}
+                        globalDataHandler.getGlobalMysql().alterColumnType("LastUpdated", "MEDIUMTEXT");
+                        globalDataHandler.getGlobalMysql().alterColumnType("ForceUpdate", "VARCHAR(5)");
+                        plugin.getTimeChecker().setProcessingEnabled(false);
+                }
+        }
+
+        private MysqlConfigSpigot buildGlobalDataConfig(ConfigurationSection section) {
+                if (section != null) {
+                        String dbType = section.getString("DbType", "");
+                        if (dbType.equalsIgnoreCase(DbType.POSTGRESQL.toString())) {
+                                return new PostgresConfigSpigot(section);
+                        }
+                }
+                return new MysqlConfigSpigot(section);
+        }
 
 	public void sendData(String... strings) {
 		clientHandler.sendMessage(strings);

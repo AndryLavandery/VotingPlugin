@@ -60,7 +60,9 @@ import com.bencodez.advancedcore.logger.Logger;
 import com.bencodez.simpleapi.file.YMLConfig;
 import com.bencodez.simpleapi.skull.SkullCache;
 import com.bencodez.simpleapi.sql.Column;
+import com.bencodez.simpleapi.sql.mysql.DbType;
 import com.bencodez.simpleapi.sql.mysql.config.MysqlConfigSpigot;
+import com.bencodez.simpleapi.sql.postgresql.config.PostgresConfigSpigot;
 import com.bencodez.simpleapi.updater.Updater;
 import com.bencodez.votingplugin.broadcast.BroadcastHandler;
 import com.bencodez.votingplugin.commands.CommandLoader;
@@ -1795,15 +1797,25 @@ public class VotingPluginMain extends AdvancedCorePlugin {
 		}
 	}
 
-	@Getter
-	private VoteLogMysqlTable voteLogMysqlTable;
+        @Getter
+        private VoteLogMysqlTable voteLogMysqlTable;
 
-	public void loadVoteLoggingMySQL() {
-		if (getConfigFile().isVoteLoggingEnabled()) {
-			if (getConfigFile().isVoteLoggingUseMainMySQL()) {
-				voteLogMysqlTable = new VoteLogMysqlTable("votingplugin_votelog", getMysql().getMysql(),
-						new MysqlConfigSpigot(getConfigFile().getVoteLoggingSection()),
-						getOptions().getDebug().isDebug()) {
+        private MysqlConfigSpigot buildSpigotSqlConfig(ConfigurationSection section) {
+                if (section != null) {
+                        String dbType = section.getString("DbType", "");
+                        if (dbType.equalsIgnoreCase(DbType.POSTGRESQL.toString())) {
+                                return new PostgresConfigSpigot(section);
+                        }
+                }
+                return new MysqlConfigSpigot(section);
+        }
+
+        public void loadVoteLoggingMySQL() {
+                if (getConfigFile().isVoteLoggingEnabled()) {
+                        if (getConfigFile().isVoteLoggingUseMainMySQL()) {
+                                voteLogMysqlTable = new VoteLogMysqlTable("votingplugin_votelog", getMysql().getMysql(),
+                                                buildSpigotSqlConfig(getConfigFile().getVoteLoggingSection()),
+                                                getOptions().getDebug().isDebug()) {
 
 					@Override
 					public void logSevere1(String string) {
@@ -1820,10 +1832,10 @@ public class VotingPluginMain extends AdvancedCorePlugin {
 						debug(e);
 					}
 				};
-			} else {
-				voteLogMysqlTable = new VoteLogMysqlTable("votingplugin_votelog",
-						new MysqlConfigSpigot(getConfigFile().getVoteLoggingSection()),
-						getOptions().getDebug().isDebug()) {
+                        } else {
+                                voteLogMysqlTable = new VoteLogMysqlTable("votingplugin_votelog",
+                                                buildSpigotSqlConfig(getConfigFile().getVoteLoggingSection()),
+                                                getOptions().getDebug().isDebug()) {
 
 					@Override
 					public void logSevere1(String string) {
