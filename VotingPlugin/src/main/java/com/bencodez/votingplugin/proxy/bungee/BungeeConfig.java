@@ -9,6 +9,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.bencodez.simpleapi.sql.mysql.DbType;
+import com.bencodez.simpleapi.sql.mysql.config.MysqlConfig;
+import com.bencodez.simpleapi.sql.mysql.config.MysqlConfigBungee;
+import com.bencodez.simpleapi.sql.mysql.config.PostgresConfigBungee;
 import com.bencodez.votingplugin.proxy.VotingPluginProxyConfig;
 
 import lombok.Getter;
@@ -31,8 +35,12 @@ public class BungeeConfig implements VotingPluginProxyConfig {
                 this.bungee = bungee;
         }
 
-        private String getSelectedDatabaseType() {
+        public String getSelectedDatabaseType() {
                 return getData().getString(DATABASE_TYPE_PATH, getData().getString("DbType", "MYSQL"));
+        }
+
+        public DbType getSelectedDbTypeEnum() {
+                return getSelectedDatabaseType().equalsIgnoreCase("postgresql") ? DbType.POSTGRESQL : DbType.MYSQL;
         }
 
         private Configuration getSelectedDatabaseSection() {
@@ -67,6 +75,25 @@ public class BungeeConfig implements VotingPluginProxyConfig {
                 }
         }
 
+        private String resolveSectionDatabaseType(Configuration section, String defaultType) {
+                if (section == null) {
+                        return defaultType;
+                }
+                return section.getString("Type", section.getString("DbType", defaultType));
+        }
+
+        public MysqlConfig getPrimaryConfig() {
+                return getSqlConfig(getData(), getSelectedDatabaseType());
+        }
+
+        public MysqlConfig getSqlConfig(Configuration section, String defaultType) {
+                String type = resolveSectionDatabaseType(section, defaultType);
+                if (type.equalsIgnoreCase("postgresql")) {
+                        return new PostgresConfigBungee(section == null ? getData() : section);
+                }
+                return new MysqlConfigBungee(section == null ? getData() : section);
+        }
+
         public Configuration getVoteLoggingDatabaseSection() {
                 Configuration voteLogging = getData().getSection("VoteLogging");
                 if (voteLogging == null) {
@@ -92,13 +119,22 @@ public class BungeeConfig implements VotingPluginProxyConfig {
                 return voteLogging;
         }
 
-	public Map<String, Object> configToMap(Configuration config) {
-		Map<String, Object> map = new HashMap<>();
-		if (config != null) {
-			config.getKeys().forEach(key -> map.put(key, config.get(key)));
-		}
-		return map;
-	}
+        public Map<String, Object> configToMap(Configuration config) {
+                Map<String, Object> map = new HashMap<>();
+                if (config != null) {
+                        config.getKeys().forEach(key -> map.put(key, config.get(key)));
+                }
+                return map;
+        }
+
+        private boolean useMainDatabase(Configuration section, boolean defaultValue) {
+                Configuration target = section == null ? getData() : section;
+                String type = resolveSectionDatabaseType(target, getSelectedDatabaseType());
+                if (type.equalsIgnoreCase("postgresql")) {
+                        return target.getBoolean("UseMainPostgres", target.getBoolean("UseMainMySQL", defaultValue));
+                }
+                return target.getBoolean("UseMainMySQL", defaultValue);
+        }
 
 	@Override
 	public boolean getAllowUnJoined() {
@@ -151,14 +187,14 @@ public class BungeeConfig implements VotingPluginProxyConfig {
 	}
 
 	@Override
-	public boolean getGlobalDataEnabled() {
-		return getData().getBoolean("GlobalData.Enabled", false);
-	}
+        public boolean getGlobalDataEnabled() {
+                return getData().getBoolean("GlobalData.Enabled", false);
+        }
 
-	@Override
-	public boolean getGlobalDataUseMainMySQL() {
-		return getData().getBoolean("GlobalData.UseMainMySQL", true);
-	}
+        @Override
+        public boolean getGlobalDataUseMainMySQL() {
+                return useMainDatabase(getData().getSection("GlobalData"), true);
+        }
 
 	@Override
 	public int getLimitVotePoints() {
@@ -489,9 +525,9 @@ public class BungeeConfig implements VotingPluginProxyConfig {
 	}
 
 	@Override
-	public boolean getVoteCacheUseMainMySQL() {
-		return getData().getBoolean("VoteCache.UseMainMySQL", true);
-	}
+        public boolean getVoteCacheUseMainMySQL() {
+                return useMainDatabase(getData().getSection("VoteCache"), true);
+        }
 
 	@Override
 	public int getTimeWeekOffSet() {
@@ -504,9 +540,9 @@ public class BungeeConfig implements VotingPluginProxyConfig {
 	}
 
 	@Override
-	public boolean getNonVotedCacheUseMainMySQL() {
-		return getData().getBoolean("NonVotedCache.UseMainMySQL", true);
-	}
+        public boolean getNonVotedCacheUseMainMySQL() {
+                return useMainDatabase(getData().getSection("NonVotedCache"), true);
+        }
 
 	@Override
 	public boolean getVoteLoggingEnabled() {
@@ -519,8 +555,8 @@ public class BungeeConfig implements VotingPluginProxyConfig {
 	}
 
 	@Override
-	public boolean getVoteLoggingUseMainMySQL() {
-		return getData().getBoolean("VoteLogging.UseMainMySQL", true);
-	}
+        public boolean getVoteLoggingUseMainMySQL() {
+                return useMainDatabase(getData().getSection("VoteLogging"), true);
+        }
 
 }

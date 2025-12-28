@@ -128,17 +128,18 @@ public class VotingPluginBungee extends Plugin implements Listener {
 		return null;
 	}
 
-	public boolean isOnline(ProxiedPlayer p) {
-		if (p != null) {
-			return p.isConnected();
-		}
+        public boolean isOnline(ProxiedPlayer p) {
+                if (p != null) {
+                        return p.isConnected();
+                }
 
-		return false;
-	}
+                return false;
+        }
 
-	private void loadMysql() {
-		votingPluginProxy.setProxyMySQL(new ProxyMysqlUserTable("VotingPlugin_Users",
-				new MysqlConfigBungee(config.getData()), config.getDebug()) {
+        private void loadMysql() {
+                MysqlConfig primaryConfig = config.getPrimaryConfig();
+
+                votingPluginProxy.setProxyMySQL(new ProxyMysqlUserTable("VotingPlugin_Users", primaryConfig, config.getDebug()) {
 
 			@Override
 			public void debug(SQLException e) {
@@ -247,9 +248,10 @@ public class VotingPluginBungee extends Plugin implements Listener {
 					}
 				});
 			} else {
-				votingPluginProxy
-						.setGlobalDataHandler(new GlobalDataHandlerProxy(new GlobalMySQL("VotingPlugin_GlobalData",
-								new MysqlConfigBungee(config.getData().getSection("GlobalData"))) {
+                                votingPluginProxy.setGlobalDataHandler(new GlobalDataHandlerProxy(
+                                                new GlobalMySQL("VotingPlugin_GlobalData", config.getSqlConfig(
+                                                                config.getData().getSection("GlobalData"),
+                                                                config.getSelectedDatabaseType())) {
 
 							@Override
 							public void debugEx(Exception e) {
@@ -627,20 +629,22 @@ public class VotingPluginBungee extends Plugin implements Listener {
 				return timer;
 			}
 
-			@Override
-			public MysqlConfig getVoteCacheMySQLConfig() {
-				return new MysqlConfigBungee(config.getData().getSection("VoteCache"));
-			}
+                    @Override
+                    public MysqlConfig getVoteCacheMySQLConfig() {
+                            return config.getSqlConfig(config.getData().getSection("VoteCache"),
+                                            config.getSelectedDatabaseType());
+                    }
 
-			@Override
-			public MysqlConfig getNonVotedCacheMySQLConfig() {
-				return new MysqlConfigBungee(config.getData().getSection("NonVotedCache"));
-			}
+                    @Override
+                    public MysqlConfig getNonVotedCacheMySQLConfig() {
+                            return config.getSqlConfig(config.getData().getSection("NonVotedCache"),
+                                            config.getSelectedDatabaseType());
+                    }
 
-                        @Override
-                        public MysqlConfig getVoteLoggingMySQLConfig() {
-                                return new MysqlConfigBungee(config.getVoteLoggingDatabaseSection());
-                        }
+                    @Override
+                    public MysqlConfig getVoteLoggingMySQLConfig() {
+                            return config.getSqlConfig(config.getVoteLoggingDatabaseSection(), config.getSelectedDatabaseType());
+                    }
 
 			@Override
 			public void loadTaskTimer(Runnable runnable, long delaySeconds, long repeatSeconds) {
@@ -793,18 +797,18 @@ public class VotingPluginBungee extends Plugin implements Listener {
 	}
 
 	public void reloadPlugin(boolean loadMysql) {
-		config.load();
-		if (loadMysql) {
-			try {
-				if (!config.getData().getString("Host", "").isEmpty()) {
-					loadMysql();
-				} else {
-					getLogger().severe("MySQL settings not set in bungeeconfig.yml");
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
+                config.load();
+                if (loadMysql) {
+                        try {
+                                if (!config.getData().getString("Host", "").isEmpty()) {
+                                        loadMysql();
+                                } else {
+                                        getLogger().severe("Database settings not set in bungeeconfig.yml");
+                                }
+                        } catch (Exception e) {
+                                e.printStackTrace();
+                        }
+                }
 		getVotingPluginProxy().reload();
 	}
 
