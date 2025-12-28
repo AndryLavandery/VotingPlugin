@@ -126,10 +126,15 @@ GlobalData:
   Enabled: false
   # Use existing mysql connection from config.yml
   UseMainMySQL: true
+  # Use existing postgres connection from config.yml
+  UseMainPostgres: true
+  # Toggle which database credentials are active without losing the MySQL values
+  # Options: mysql, postgresql
+  Type: mysql
   # Mysql settings only used if above is false
   Host: ''
   # Default port is 3306
-  Port: 3306 
+  Port: 3306
   Database: ''
   Username: ''
   Password: ''
@@ -141,6 +146,17 @@ GlobalData:
   #PublicKeyRetrieval: false
   #Attempt to use mariadb driver
   #UseMariaDB: false
+  PostgreSQL:
+    Host: ''
+    # Default port is 5432
+    Port: 5432
+    Database: ''
+    Username: ''
+    Password: ''
+    MaxConnections: 1
+    Prefix: ''
+    DbType: POSTGRESQL
+    #UseSSL: false
 
 ##########################################
 # For socket setup

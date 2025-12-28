@@ -10,10 +10,15 @@ import com.bencodez.simpleapi.file.annotation.ConfigDataInt;
 import com.bencodez.simpleapi.file.annotation.ConfigDataListString;
 import com.bencodez.simpleapi.file.annotation.ConfigDataString;
 import com.bencodez.votingplugin.VotingPluginMain;
+import org.bukkit.configuration.ConfigurationSection;
 
 import lombok.Getter;
 
 public class BungeeSettings extends YMLFile {
+        private static final String[] DATABASE_KEYS = { "Host", "Port", "Database", "Username", "Password", "MaxConnections",
+                        "Name", "Prefix", "DbType", "Driver", "UseSSL", "PublicKeyRetrieval", "UseMariaDB", "MaxLifeTime",
+                        "MinimumIdle", "IdleTimeoutMs", "KeepaliveMs", "ValidationMs", "LeakDetectMs", "ConnectionTimeout",
+                        "Line", "PoolName" };
 
 	@ConfigDataBoolean(path = "BungeeBroadcast")
 	@Getter
@@ -135,13 +140,17 @@ public class BungeeSettings extends YMLFile {
 	@Getter
 	private boolean votifierBypass = false;
 
-	@ConfigDataBoolean(path = "DisableBroadcast")
-	@Getter
-	private boolean disableBroadcast = false;
+        @ConfigDataBoolean(path = "DisableBroadcast")
+        @Getter
+        private boolean disableBroadcast = false;
 
-	@ConfigDataBoolean(path = "GlobalData.UseMainMySQL")
-	@Getter
-	private boolean globlalDataUseMainMySQL = true;
+        @ConfigDataBoolean(path = "GlobalData.UseMainPostgres")
+        @Getter
+        private boolean globlalDataUseMainPostgres = true;
+
+        @ConfigDataBoolean(path = "GlobalData.UseMainMySQL")
+        @Getter
+        private boolean globlalDataUseMainMySQL = true;
 
 	@ConfigDataBoolean(path = "GlobalData.Enabled")
 	@Getter
@@ -160,10 +169,41 @@ public class BungeeSettings extends YMLFile {
 		return getServer().replace("-", "_");
 	}
 
-	@Override
-	public void loadValues() {
-		new AnnotationHandler().load(getData(), this);
-	}
+        @Override
+        public void loadValues() {
+                new AnnotationHandler().load(getData(), this);
+        }
+
+        public boolean useMainDatabaseForGlobalData(String storageType) {
+                if (storageType != null && storageType.equalsIgnoreCase("POSTGRESQL")) {
+                        return globlalDataUseMainPostgres;
+                }
+                return globlalDataUseMainMySQL;
+        }
+
+        public ConfigurationSection getSelectedGlobalDataSection() {
+                ConfigurationSection section = getData().getConfigurationSection("GlobalData");
+                if (section == null) {
+                        return null;
+                }
+
+                String type = section.getString("Type", section.getString("DbType", "MYSQL"));
+                ConfigurationSection selected = section
+                                .getConfigurationSection(type.equalsIgnoreCase("postgresql") ? "PostgreSQL" : "MySQL");
+
+                if (selected == null) {
+                        return section;
+                }
+
+                for (String key : DATABASE_KEYS) {
+                        Object value = selected.get(key, section.get(key));
+                        if (value != null) {
+                                section.set(key, value);
+                        }
+                }
+
+                return section;
+        }
 
 	@Override
 	public void onFileCreation() {

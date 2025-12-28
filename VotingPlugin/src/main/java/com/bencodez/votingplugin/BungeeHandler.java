@@ -96,9 +96,10 @@ public class BungeeHandler implements Listener {
 		if (data.containsKey("ForceUpdate")) {
 			boolean b = checkGlobalDataTimeValue(data.get("ForceUpdate"));
 			if (b) {
-				if (plugin.getStorageType().equals(UserStorage.MYSQL)) {
-					plugin.getMysql().clearCacheBasic();
-				}
+                        if (plugin.getStorageType().equals(UserStorage.MYSQL)
+                                        || plugin.getStorageType().toString().equalsIgnoreCase("POSTGRESQL")) {
+                                plugin.getMysql().clearCacheBasic();
+                        }
 				plugin.getUserManager().getDataManager().clearCache();
 				plugin.setUpdate(true);
 				plugin.update();
@@ -726,8 +727,11 @@ public class BungeeHandler implements Listener {
 			if (globalDataHandler != null) {
 				globalDataHandler.getGlobalMysql().close();
 			}
-			if (plugin.getBungeeSettings().isGloblalDataUseMainMySQL()
-					&& plugin.getStorageType().equals(UserStorage.MYSQL)) {
+                        boolean sqlStorage = plugin.getStorageType().equals(UserStorage.MYSQL)
+                                        || plugin.getStorageType().toString().equalsIgnoreCase("POSTGRESQL");
+                        if (plugin.getBungeeSettings()
+                                        .useMainDatabaseForGlobalData(plugin.getStorageType().toString())
+                                        && sqlStorage) {
 				globalDataHandler = new GlobalDataHandler(
 						new GlobalMySQL("VotingPlugin_GlobalData", plugin.getMysql().getMysql()) {
 
@@ -757,9 +761,8 @@ public class BungeeHandler implements Listener {
 							}
 						});
 			} else {
-				globalDataHandler = new GlobalDataHandler(
-						new GlobalMySQL("VotingPlugin_GlobalData", new MysqlConfigSpigot(
-								plugin.getBungeeSettings().getData().getConfigurationSection("GlobalData"))) {
+                                globalDataHandler = new GlobalDataHandler(new GlobalMySQL("VotingPlugin_GlobalData",
+                                                new MysqlConfigSpigot(plugin.getBungeeSettings().getSelectedGlobalDataSection())) {
 
 							@Override
 							public void debugEx(Exception e) {
