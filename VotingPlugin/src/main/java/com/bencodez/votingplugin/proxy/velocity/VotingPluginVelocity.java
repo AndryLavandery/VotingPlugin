@@ -35,8 +35,10 @@ import com.bencodez.advancedcore.bungeeapi.globaldata.GlobalDataHandlerProxy;
 import com.bencodez.advancedcore.bungeeapi.globaldata.GlobalMySQL;
 import com.bencodez.simpleapi.file.velocity.VelocityYMLFile;
 import com.bencodez.simpleapi.sql.DataType;
+import com.bencodez.simpleapi.sql.mysql.DbType;
 import com.bencodez.simpleapi.sql.mysql.config.MysqlConfig;
 import com.bencodez.simpleapi.sql.mysql.config.MysqlConfigVelocity;
+import com.bencodez.simpleapi.sql.mysql.config.PostgresConfigVelocity;
 import com.bencodez.votingplugin.proxy.BungeeVersion;
 import com.bencodez.votingplugin.proxy.ProxyMysqlUserTable;
 import com.bencodez.votingplugin.proxy.VotingPluginProxy;
@@ -184,14 +186,57 @@ public class VotingPluginVelocity {
 					}
 				}
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+                } catch (Exception e) {
+                        e.printStackTrace();
+                }
+        }
 
-	private void loadMysql() {
-		votingPluginProxy.setProxyMySQL(
-				new ProxyMysqlUserTable("VotingPlugin_Users", new MysqlConfigVelocity(config), config.getDebug()) {
+        private boolean isPostgresType(String dbType) {
+                return dbType != null && (dbType.equalsIgnoreCase(DbType.POSTGRESQL.name()) || dbType.equalsIgnoreCase("postgres"));
+        }
+
+        private boolean isPostgresConfigured() {
+                return isPostgresType(config.getDatabaseType());
+        }
+
+        private MysqlConfig createDatabaseConfig() {
+                return createDatabaseConfig("");
+        }
+
+        private MysqlConfig createDatabaseConfig(String prePath) {
+                String type = config.getDatabaseType();
+                if (prePath != null && !prePath.isEmpty()) {
+                        type = config.getString(config.getNode(prePath, "DbType"), type);
+                } else {
+                        type = config.getString(config.getNode("DbType"), type);
+                }
+
+                if (isPostgresType(type)) {
+                        return new PostgresConfigVelocity(prePath, config);
+                }
+                return new MysqlConfigVelocity(prePath, config);
+        }
+
+        private boolean ensurePostgresDriverPresent() {
+                try {
+                        Class.forName("org.postgresql.Driver");
+                        return true;
+                } catch (ClassNotFoundException e) {
+                        logger.error("PostgreSQL driver not found. Please add org.postgresql:postgresql to the plugins folder.");
+                        return false;
+                }
+        }
+
+        private boolean loadMysql() {
+                if (isPostgresConfigured() && !ensurePostgresDriverPresent()) {
+                        return false;
+                }
+
+                MysqlConfig userTableConfig = createDatabaseConfig();
+
+                logger.info("Using database type: " + userTableConfig.getDbType());
+
+                votingPluginProxy.setProxyMySQL(new ProxyMysqlUserTable("VotingPlugin_Users", userTableConfig, config.getDebug()) {
 
 					@Override
 					public void debug(SQLException e) {
@@ -296,8 +341,8 @@ public class VotingPluginVelocity {
 					}
 				});
 			} else {
-				votingPluginProxy.setGlobalDataHandler(new GlobalDataHandlerProxy(
-						new GlobalMySQL("VotingPlugin_GlobalData", new MysqlConfigVelocity("GlobalData", config)) {
+                                votingPluginProxy.setGlobalDataHandler(new GlobalDataHandlerProxy(
+                                                new GlobalMySQL("VotingPlugin_GlobalData", createDatabaseConfig("GlobalData")) {
 
 							@Override
 							public void debugEx(Exception e) {
@@ -401,17 +446,19 @@ public class VotingPluginVelocity {
 		getVotingPluginProxy().getProxyMySQL().alterColumnType("LastDailyTotal", "INT DEFAULT '0'");
 		getVotingPluginProxy().getProxyMySQL().alterColumnType("OfflineRewards", "MEDIUMTEXT");
 		getVotingPluginProxy().getProxyMySQL().alterColumnType("DayVoteStreakLastUpdate", "MEDIUMTEXT");
-		if (config.getStoreMonthTotalsWithDate()) {
-			getVotingPluginProxy().getProxyMySQL().alterColumnType(
-					getVotingPluginProxy().getMonthTotalsWithDatePath(LocalDateTime.now()), "INT DEFAULT '0'");
-			getVotingPluginProxy().getProxyMySQL().alterColumnType(
-					getVotingPluginProxy().getMonthTotalsWithDatePath(LocalDateTime.now().plusMonths(1)),
-					"INT DEFAULT '0'");
-			getVotingPluginProxy().getProxyMySQL().alterColumnType(
-					getVotingPluginProxy().getMonthTotalsWithDatePath(LocalDateTime.now().plusMonths(2)),
-					"INT DEFAULT '0'");
-		}
-	}
+                if (config.getStoreMonthTotalsWithDate()) {
+                        getVotingPluginProxy().getProxyMySQL().alterColumnType(
+                                        getVotingPluginProxy().getMonthTotalsWithDatePath(LocalDateTime.now()), "INT DEFAULT '0'");
+                        getVotingPluginProxy().getProxyMySQL().alterColumnType(
+                                        getVotingPluginProxy().getMonthTotalsWithDatePath(LocalDateTime.now().plusMonths(1)),
+                                        "INT DEFAULT '0'");
+                        getVotingPluginProxy().getProxyMySQL().alterColumnType(
+                                        getVotingPluginProxy().getMonthTotalsWithDatePath(LocalDateTime.now().plusMonths(2)),
+                                        "INT DEFAULT '0'");
+                }
+
+                return true;
+        }
 
 	@Subscribe
 	public void onPluginMessagingReceived(PluginMessageEvent event) {
@@ -725,25 +772,25 @@ public class VotingPluginVelocity {
 				reloadPlugin(mysql);
 			}
 
-			@Override
-			public ScheduledExecutorService getScheduler() {
-				return timer;
-			}
+                        @Override
+                        public ScheduledExecutorService getScheduler() {
+                                return timer;
+                        }
 
-			@Override
-			public MysqlConfig getVoteCacheMySQLConfig() {
-				return new MysqlConfigVelocity("VoteCache", config);
-			}
+                        @Override
+                        public MysqlConfig getVoteCacheMySQLConfig() {
+                                return createDatabaseConfig("VoteCache");
+                        }
 
-			@Override
-			public MysqlConfig getNonVotedCacheMySQLConfig() {
-				return new MysqlConfigVelocity("NonVotedCache", config);
-			}
+                        @Override
+                        public MysqlConfig getNonVotedCacheMySQLConfig() {
+                                return createDatabaseConfig("NonVotedCache");
+                        }
 
                         @Override
                         public MysqlConfig getVoteLoggingMySQLConfig() {
                                 config.getVoteLoggingDatabaseNode();
-                                return new MysqlConfigVelocity("VoteLogging", config);
+                                return createDatabaseConfig("VoteLogging");
                         }
 
 			@Override
@@ -766,15 +813,15 @@ public class VotingPluginVelocity {
 			}
 		}
 
-		boolean mysqlLoaded = true;
-		try {
-			if (!config.getString(config.getNode("Host"), "").isEmpty()) {
-				loadMysql();
-			} else {
-				mysqlLoaded = false;
-				logger.error("MySQL settings not set in bungeeconfig.yml");
-			}
-		} catch (Exception e) {
+                boolean mysqlLoaded = true;
+                try {
+                        if (!config.getString(config.getNode("Host"), "").isEmpty()) {
+                                mysqlLoaded = loadMysql();
+                        } else {
+                                mysqlLoaded = false;
+                                logger.error("MySQL settings not set in bungeeconfig.yml");
+                        }
+                } catch (Exception e) {
 			mysqlLoaded = false;
 			e.printStackTrace();
 		}
@@ -860,22 +907,24 @@ public class VotingPluginVelocity {
 
 		metrics.addCustomChart(new SimplePie("bungee_method", () -> getConfig().getBungeeMethod().toString()));
 
-		metrics.addCustomChart(new SimplePie("sendtoallservers", () -> "" + getConfig().getSendVotesToAllServers()));
+                metrics.addCustomChart(new SimplePie("sendtoallservers", () -> "" + getConfig().getSendVotesToAllServers()));
 
-		metrics.addCustomChart(new SimplePie("allowunjoined", () -> "" + getConfig().getAllowUnJoined()));
+                metrics.addCustomChart(new SimplePie("allowunjoined", () -> "" + getConfig().getAllowUnJoined()));
 
-		metrics.addCustomChart(new SimplePie("pointsonvote", () -> "" + getConfig().getPointsOnVote()));
+                metrics.addCustomChart(new SimplePie("pointsonvote", () -> "" + getConfig().getPointsOnVote()));
 
-		metrics.addCustomChart(new SimplePie("bungeemanagetotals", () -> "" + getConfig().getBungeeManageTotals()));
+                metrics.addCustomChart(new SimplePie("bungeemanagetotals", () -> "" + getConfig().getBungeeManageTotals()));
 
-		metrics.addCustomChart(new SimplePie("waitforuseronline", () -> "" + getConfig().getWaitForUserOnline()));
+                metrics.addCustomChart(new SimplePie("waitforuseronline", () -> "" + getConfig().getWaitForUserOnline()));
 
-		metrics.addCustomChart(new SimplePie("plugin_version", () -> "" + version));
+                metrics.addCustomChart(new SimplePie("plugin_version", () -> "" + version));
 
-		metrics.addCustomChart(new SimplePie("globaldata_enabled", () -> "" + getConfig().getGlobalDataEnabled()));
-		if (getConfig().getGlobalDataEnabled()) {
-			metrics.addCustomChart(
-					new SimplePie("globaldata_usemainmysql", () -> "" + getConfig().getGlobalDataUseMainMySQL()));
+                metrics.addCustomChart(new SimplePie("database_type", () -> "" + config.getDatabaseType().toUpperCase()));
+
+                metrics.addCustomChart(new SimplePie("globaldata_enabled", () -> "" + getConfig().getGlobalDataEnabled()));
+                if (getConfig().getGlobalDataEnabled()) {
+                        metrics.addCustomChart(
+                                        new SimplePie("globaldata_usemainmysql", () -> "" + getConfig().getGlobalDataUseMainMySQL()));
 		}
 
 		metrics.addCustomChart(
@@ -900,12 +949,15 @@ public class VotingPluginVelocity {
                 if (loadMysql) {
                         try {
                                 if (!config.getString(config.getNode("Host"), "").isEmpty()) {
-                                        loadMysql();
-				} else {
-					logger.error("MySQL settings not set in bungeeconfig.yml");
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
+                                        boolean loaded = loadMysql();
+                                        if (!loaded) {
+                                                logger.error("Database failed to load. Check your configuration and database driver.");
+                                        }
+                                } else {
+                                        logger.error("MySQL settings not set in bungeeconfig.yml");
+                                }
+                        } catch (Exception e) {
+                                e.printStackTrace();
 			}
 		}
 		getVotingPluginProxy().reload();
