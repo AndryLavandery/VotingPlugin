@@ -40,6 +40,8 @@ import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler.MessageHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttServerComm;
 import com.bencodez.simpleapi.servercomm.mysql.ProxyMessenger;
+import com.bencodez.simpleapi.servercomm.postgresql.PostgresProxyMessenger;
+import com.bencodez.simpleapi.sql.mysql.DbType;
 import com.bencodez.simpleapi.servercomm.redis.RedisHandler;
 import com.bencodez.simpleapi.servercomm.redis.RedisListener;
 import com.bencodez.simpleapi.servercomm.sockets.ClientHandler;
@@ -122,6 +124,9 @@ public abstract class VotingPluginProxy {
 
 	@Getter
 	private ProxyMessenger proxyMysqlMessenger;
+
+	@Getter
+	private PostgresProxyMessenger proxyPostgresMessenger;
 
 	@Getter
 	private VoteCacheHandler voteCacheHandler;
@@ -577,7 +582,16 @@ public abstract class VotingPluginProxy {
 
 		if (method.equals(BungeeMethod.MYSQL)) {
 			try {
-				proxyMysqlMessenger = new ProxyMessenger("VotingPlugin",
+				if (getProxyMySQL().getMysql().getConnectionManager().getDbType() == DbType.POSTGRESQL) {
+					proxyPostgresMessenger = new PostgresProxyMessenger("VotingPlugin",
+							getProxyMySQL().getMysql().getConnectionManager().getDataSource(), msg -> {
+								debug("Got from " + msg.sourceServerId + ": " + msg.payload);
+								String[] data = msg.payload.split(Pattern.quote("%l%"));
+
+								globalMessageProxyHandler.onMessage(data[0], ArrayUtils.convertAndRemoveFirst(data));
+							});
+				} else {
+					proxyMysqlMessenger = new ProxyMessenger("VotingPlugin",
 						getProxyMySQL().getMysql().getConnectionManager().getDataSource(), msg -> {
 							debug("Got from " + msg.sourceServerId + ": " + msg.payload);
 							String[] data = msg.payload.split(Pattern.quote("%l%"));
@@ -585,6 +599,7 @@ public abstract class VotingPluginProxy {
 							globalMessageProxyHandler.onMessage(data[0], ArrayUtils.convertAndRemoveFirst(data));
 
 						});
+				}
 			} catch (SQLException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -707,7 +722,12 @@ public abstract class VotingPluginProxy {
 					// sendPluginMessageServer(server, channel, messageData);
 
 					try {
-						proxyMysqlMessenger.sendToBackend(server, channel + "%l%" + String.join("%l%", messageData));
+						if (proxyPostgresMessenger != null) {
+							proxyPostgresMessenger.sendToBackend(server,
+									channel + "%l%" + String.join("%l%", messageData));
+						} else {
+							proxyMysqlMessenger.sendToBackend(server, channel + "%l%" + String.join("%l%", messageData));
+						}
 					} catch (SQLException e) {
 						e.printStackTrace();
 					}
@@ -1006,6 +1026,10 @@ public abstract class VotingPluginProxy {
 
 		if (getProxyMysqlMessenger() != null) {
 			getProxyMysqlMessenger().shutdown();
+		}
+
+		if (getProxyPostgresMessenger() != null) {
+			getProxyPostgresMessenger().shutdown();
 		}
 
 		if (getProxyMySQL() != null) {
