@@ -53,14 +53,16 @@ public class VelocityConfig extends VelocityYMLFile implements VotingPluginProxy
                 }
         }
 
-        public ConfigurationNode getVoteLoggingDatabaseNode() {
-                ConfigurationNode voteLogging = getNode("VoteLogging");
-                ConfigurationNode dbNode = voteLogging.getNode("Database");
+
+        public ConfigurationNode getDatabaseNode(String path) {
+                ConfigurationNode section = getNode(path);
+                ConfigurationNode dbNode = section.getNode("Database");
                 if (dbNode == null || dbNode.isVirtual()) {
-                        return voteLogging;
+                        return section;
                 }
 
-                String type = getString(dbNode.getNode("Type"), getString(dbNode.getNode("DbType"), getDatabaseType()));
+                String type = getString(dbNode.getNode("Type"),
+                                getString(dbNode.getNode("DbType"), getDatabaseType()));
                 ConfigurationNode selected = type.equalsIgnoreCase("postgresql") ? dbNode.getNode("PostgreSQL")
                                 : dbNode.getNode("MySQL");
                 if (selected == null || selected.isVirtual()) {
@@ -74,10 +76,14 @@ public class VelocityConfig extends VelocityYMLFile implements VotingPluginProxy
                                 defaultValue = dbNode.getNode(key).getValue();
                         }
                         Object value = sourceNode.isVirtual() ? defaultValue : sourceNode.getValue();
-                        voteLogging.getNode(key).setValue(value);
+                        section.getNode(key).setValue(value);
                 }
 
-                return voteLogging;
+                return section;
+        }
+
+        public ConfigurationNode getVoteLoggingDatabaseNode() {
+                return getDatabaseNode("VoteLogging");
         }
 
         private Object getDefaultDatabaseValue(String type, String key) {

@@ -6,7 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
+import com.bencodez.simpleapi.sql.mysql.DbType;
 import com.bencodez.simpleapi.sql.mysql.MySQL;
 import com.bencodez.simpleapi.sql.mysql.config.MysqlConfig;
 import com.bencodez.simpleapi.sql.mysql.queries.Query;
@@ -60,7 +62,9 @@ public abstract class ProxyNonVotedPlayersTable {
 			logSevere("Failed to connect to MySQL for non-voted players cache!");
 		}
 		try {
-			new Query(mysql, "USE `" + config.getDatabase() + "`;").executeUpdate();
+			if (mysql.getConnectionManager().getDbType() != DbType.POSTGRESQL) {
+				new Query(mysql, "USE `" + config.getDatabase() + "`;").executeUpdate();
+			}
 		} catch (SQLException e) {
 			logSevere("Failed to select database: " + config.getDatabase());
 			debug(e);
@@ -70,13 +74,32 @@ public abstract class ProxyNonVotedPlayersTable {
 	}
 
 	private void createTableIfNeeded() {
-		String sql = "CREATE TABLE IF NOT EXISTS `" + tableName + "` (" + "id INT AUTO_INCREMENT PRIMARY KEY,"
-				+ "uuid VARCHAR(36) NOT NULL," + "playerName VARCHAR(100) NOT NULL," + "`lastTime` BIGINT NOT NULL,"
-				+ "UNIQUE KEY uniq_playerName (`playerName`)," + "KEY idx_uuid (`uuid`),"
-				+ "KEY idx_lastTime (`lastTime`)" + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+		boolean postgres = mysql.getConnectionManager().getDbType() == DbType.POSTGRESQL;
+		String sql;
+		if (postgres) {
+			sql = "CREATE TABLE IF NOT EXISTS \"" + tableName + "\" ("
+					+ "\"id\" SERIAL PRIMARY KEY,"
+					+ "\"uuid\" UUID NOT NULL,"
+					+ "\"playerName\" VARCHAR(100) NOT NULL,"
+					+ "\"lastTime\" BIGINT NOT NULL,"
+					+ "CONSTRAINT \"" + tableName + "_uniq_playername\" UNIQUE (\"playerName\")"
+					+ ");";
+		} else {
+			sql = "CREATE TABLE IF NOT EXISTS `" + tableName + "` (" + "id INT AUTO_INCREMENT PRIMARY KEY,"
+					+ "uuid VARCHAR(36) NOT NULL," + "playerName VARCHAR(100) NOT NULL,"
+					+ "`lastTime` BIGINT NOT NULL," + "UNIQUE KEY uniq_playerName (`playerName`),"
+					+ "KEY idx_uuid (`uuid`)," + "KEY idx_lastTime (`lastTime`)"
+					+ ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+		}
 
 		try {
 			new Query(mysql, sql).executeUpdate();
+			if (postgres) {
+				new Query(mysql, "CREATE INDEX IF NOT EXISTS \"" + tableName + "_idx_uuid\" ON \"" + tableName
+						+ "\" (\"uuid\");").executeUpdate();
+				new Query(mysql, "CREATE INDEX IF NOT EXISTS \"" + tableName + "_idx_lasttime\" ON \"" + tableName
+						+ "\" (\"lastTime\");").executeUpdate();
+			}
 		} catch (SQLException e) {
 			debug(e);
 		}
@@ -87,11 +110,19 @@ public abstract class ProxyNonVotedPlayersTable {
 	}
 
 	public void upsertPlayer(String uuid, String playerName, long lastTime) {
-		String sql = "INSERT INTO `" + tableName + "` (uuid, playerName, lastTime) " + "VALUES (?, ?, ?) "
-				+ "ON DUPLICATE KEY UPDATE uuid = VALUES(uuid), lastTime = VALUES(lastTime);";
+		boolean postgres = mysql.getConnectionManager().getDbType() == DbType.POSTGRESQL;
+		String sql = postgres
+				? "INSERT INTO \"" + tableName + "\" (\"uuid\", \"playerName\", \"lastTime\") VALUES (?, ?, ?) "
+						+ "ON CONFLICT (\"playerName\") DO UPDATE SET \"uuid\" = EXCLUDED.\"uuid\", \"lastTime\" = EXCLUDED.\"lastTime\";"
+				: "INSERT INTO `" + tableName + "` (uuid, playerName, lastTime) VALUES (?, ?, ?) "
+						+ "ON DUPLICATE KEY UPDATE uuid = VALUES(uuid), lastTime = VALUES(lastTime);";
 		try (Connection conn = mysql.getConnectionManager().getConnection();
 				PreparedStatement ps = conn.prepareStatement(sql)) {
-			ps.setString(1, uuid);
+			if (postgres) {
+				ps.setObject(1, UUID.fromString(uuid));
+			} else {
+				ps.setString(1, uuid);
+			}
 			ps.setString(2, playerName);
 			ps.setLong(3, lastTime);
 			ps.executeUpdate();
@@ -101,7 +132,9 @@ public abstract class ProxyNonVotedPlayersTable {
 	}
 
 	public String getUuidByPlayerName(String playerName) {
-		String sql = "SELECT uuid FROM `" + tableName + "` WHERE playerName = ?;";
+		boolean postgres = mysql.getConnectionManager().getDbType() == DbType.POSTGRESQL;
+		String sql = postgres ? "SELECT \"uuid\" FROM \"" + tableName + "\" WHERE \"playerName\" = ?;"
+				: "SELECT uuid FROM `" + tableName + "` WHERE playerName = ?;";
 		try (Connection conn = mysql.getConnectionManager().getConnection();
 				PreparedStatement ps = conn.prepareStatement(sql)) {
 			ps.setString(1, playerName);
@@ -118,7 +151,9 @@ public abstract class ProxyNonVotedPlayersTable {
 	}
 
 	public void removeByPlayerName(String playerName) {
-		String sql = "DELETE FROM `" + tableName + "` WHERE playerName = ?;";
+		boolean postgres = mysql.getConnectionManager().getDbType() == DbType.POSTGRESQL;
+		String sql = postgres ? "DELETE FROM \"" + tableName + "\" WHERE \"playerName\" = ?;"
+				: "DELETE FROM `" + tableName + "` WHERE playerName = ?;";
 		try (Connection conn = mysql.getConnectionManager().getConnection();
 				PreparedStatement ps = conn.prepareStatement(sql)) {
 			ps.setString(1, playerName);
@@ -130,7 +165,10 @@ public abstract class ProxyNonVotedPlayersTable {
 
 	public List<NonVotedPlayerRow> getAllRows() {
 		List<NonVotedPlayerRow> list = new ArrayList<>();
-		String sql = "SELECT id, uuid, playerName, lastTime FROM `" + tableName + "`;";
+		boolean postgres = mysql.getConnectionManager().getDbType() == DbType.POSTGRESQL;
+		String sql = postgres
+				? "SELECT \"id\", \"uuid\", \"playerName\", \"lastTime\" FROM \"" + tableName + "\";"
+				: "SELECT id, uuid, playerName, lastTime FROM `" + tableName + "`;";
 		try (Connection conn = mysql.getConnectionManager().getConnection();
 				PreparedStatement ps = conn.prepareStatement(sql);
 				ResultSet rs = ps.executeQuery()) {
@@ -146,7 +184,11 @@ public abstract class ProxyNonVotedPlayersTable {
 
 	public void clearAll() {
 		try {
-			new Query(mysql, "TRUNCATE TABLE `" + tableName + "`;").executeUpdate();
+			if (mysql.getConnectionManager().getDbType() == DbType.POSTGRESQL) {
+				new Query(mysql, "TRUNCATE TABLE \"" + tableName + "\" RESTART IDENTITY;").executeUpdate();
+			} else {
+				new Query(mysql, "TRUNCATE TABLE `" + tableName + "`;").executeUpdate();
+			}
 		} catch (SQLException e) {
 			debug(e);
 		}
