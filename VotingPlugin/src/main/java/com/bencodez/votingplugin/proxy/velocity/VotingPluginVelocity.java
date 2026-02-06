@@ -42,7 +42,7 @@ import com.bencodez.votingplugin.proxy.ProxyMysqlUserTable;
 import com.bencodez.votingplugin.proxy.VotingPluginProxy;
 import com.bencodez.votingplugin.proxy.VotingPluginProxyConfig;
 import com.bencodez.votingplugin.topvoter.TopVoter;
-import com.google.inject.Inject;
+import javax.inject.Inject;
 import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
@@ -297,7 +297,7 @@ public class VotingPluginVelocity {
 				});
 			} else {
 				votingPluginProxy.setGlobalDataHandler(new GlobalDataHandlerProxy(
-						new GlobalMySQL("VotingPlugin_GlobalData", new MysqlConfigVelocity("GlobalData", config)) {
+						new GlobalMySQL("VotingPlugin_GlobalData", new MysqlConfigVelocity(config.getDatabaseNode("GlobalData"))) {
 
 							@Override
 							public void debugEx(Exception e) {
@@ -732,18 +732,18 @@ public class VotingPluginVelocity {
 
 			@Override
 			public MysqlConfig getVoteCacheMySQLConfig() {
-				return new MysqlConfigVelocity("VoteCache", config);
+				return new MysqlConfigVelocity(config.getDatabaseNode("VoteCache"));
 			}
 
 			@Override
 			public MysqlConfig getNonVotedCacheMySQLConfig() {
-				return new MysqlConfigVelocity("NonVotedCache", config);
+				return new MysqlConfigVelocity(config.getDatabaseNode("NonVotedCache"));
 			}
 
                         @Override
                         public MysqlConfig getVoteLoggingMySQLConfig() {
                                 config.getVoteLoggingDatabaseNode();
-                                return new MysqlConfigVelocity("VoteLogging", config);
+                                return new MysqlConfigVelocity(config.getVoteLoggingDatabaseNode());
                         }
 
 			@Override

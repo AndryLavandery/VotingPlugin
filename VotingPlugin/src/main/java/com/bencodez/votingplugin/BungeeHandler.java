@@ -30,7 +30,7 @@ import com.bencodez.simpleapi.messages.MessageAPI;
 import com.bencodez.simpleapi.servercomm.global.GlobalMessageHandler;
 import com.bencodez.simpleapi.servercomm.global.GlobalMessageListener;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler;
-import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler.MessageHandler;
+import com.bencodez.simpleapi.servercomm.mqtt.MessageHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttServerComm;
 import com.bencodez.simpleapi.servercomm.mysql.BackendMessenger;
 import com.bencodez.simpleapi.servercomm.postgresql.PostgresBackendMessenger;
@@ -837,13 +837,25 @@ public class BungeeHandler implements Listener {
         }
 
         private MysqlConfigSpigot buildGlobalDataConfig(ConfigurationSection section) {
-                if (section != null) {
-                        String dbType = section.getString("DbType", "");
-                        if (dbType.equalsIgnoreCase(DbType.POSTGRESQL.toString())) {
-                                return new PostgresConfigSpigot(section);
+                ConfigurationSection resolved = section;
+                if (section != null && section.isConfigurationSection("Database")) {
+                        ConfigurationSection dbSection = section.getConfigurationSection("Database");
+                        String type = dbSection.getString("Type", dbSection.getString("DbType", "MYSQL"));
+                        ConfigurationSection typedSection = type.equalsIgnoreCase("postgresql")
+                                        ? dbSection.getConfigurationSection("PostgreSQL")
+                                        : dbSection.getConfigurationSection("MySQL");
+                        if (typedSection != null) {
+                                resolved = typedSection;
+                        } else {
+                                resolved = dbSection;
                         }
                 }
-                return new MysqlConfigSpigot(section);
+
+                String dbType = resolved != null ? resolved.getString("DbType", "") : "";
+                if (dbType.equalsIgnoreCase(DbType.POSTGRESQL.toString())) {
+                        return new PostgresConfigSpigot(resolved);
+                }
+                return new MysqlConfigSpigot(resolved);
         }
 
 	public void sendData(String... strings) {
