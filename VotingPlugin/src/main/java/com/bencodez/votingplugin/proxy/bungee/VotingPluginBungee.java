@@ -249,7 +249,7 @@ public class VotingPluginBungee extends Plugin implements Listener {
 			} else {
 				votingPluginProxy
 						.setGlobalDataHandler(new GlobalDataHandlerProxy(new GlobalMySQL("VotingPlugin_GlobalData",
-								new MysqlConfigBungee(config.getData().getSection("GlobalData"))) {
+								new MysqlConfigBungee(config.getDatabaseSection("GlobalData"))) {
 
 							@Override
 							public void debugEx(Exception e) {
@@ -629,12 +629,12 @@ public class VotingPluginBungee extends Plugin implements Listener {
 
 			@Override
 			public MysqlConfig getVoteCacheMySQLConfig() {
-				return new MysqlConfigBungee(config.getData().getSection("VoteCache"));
+				return new MysqlConfigBungee(config.getDatabaseSection("VoteCache"));
 			}
 
 			@Override
 			public MysqlConfig getNonVotedCacheMySQLConfig() {
-				return new MysqlConfigBungee(config.getData().getSection("NonVotedCache"));
+				return new MysqlConfigBungee(config.getDatabaseSection("NonVotedCache"));
 			}
 
                         @Override

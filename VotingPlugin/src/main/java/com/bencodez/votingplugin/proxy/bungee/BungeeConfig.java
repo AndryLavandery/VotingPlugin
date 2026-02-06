@@ -67,15 +67,16 @@ public class BungeeConfig implements VotingPluginProxyConfig {
                 }
         }
 
-        public Configuration getVoteLoggingDatabaseSection() {
-                Configuration voteLogging = getData().getSection("VoteLogging");
-                if (voteLogging == null) {
+
+        public Configuration getDatabaseSection(String path) {
+                Configuration section = getData().getSection(path);
+                if (section == null) {
                         return null;
                 }
 
-                Configuration databaseSection = voteLogging.getSection("Database");
+                Configuration databaseSection = section.getSection("Database");
                 if (databaseSection == null) {
-                        return voteLogging;
+                        return section;
                 }
 
                 String type = databaseSection.getString("Type",
@@ -86,10 +87,14 @@ public class BungeeConfig implements VotingPluginProxyConfig {
                 for (String key : DATABASE_KEYS) {
                         Object value = (selected != null) ? selected.get(key, getDefaultDatabaseValue(key, type))
                                         : databaseSection.get(key, getDefaultDatabaseValue(key, type));
-                        voteLogging.set(key, value);
+                        section.set(key, value);
                 }
 
-                return voteLogging;
+                return section;
+        }
+
+        public Configuration getVoteLoggingDatabaseSection() {
+                return getDatabaseSection("VoteLogging");
         }
 
 	public Map<String, Object> configToMap(Configuration config) {
