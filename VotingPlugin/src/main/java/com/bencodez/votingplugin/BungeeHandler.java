@@ -30,7 +30,7 @@ import com.bencodez.simpleapi.messages.MessageAPI;
 import com.bencodez.simpleapi.servercomm.global.GlobalMessageHandler;
 import com.bencodez.simpleapi.servercomm.global.GlobalMessageListener;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler;
-import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler.MessageHandler;
+import com.bencodez.simpleapi.servercomm.mqtt.MessageHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttServerComm;
 import com.bencodez.simpleapi.servercomm.mysql.BackendMessenger;
 import com.bencodez.simpleapi.servercomm.postgresql.PostgresBackendMessenger;

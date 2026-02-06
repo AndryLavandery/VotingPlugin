@@ -37,7 +37,7 @@ import com.bencodez.simpleapi.json.JsonParser;
 import com.bencodez.simpleapi.servercomm.global.GlobalMessageListener;
 import com.bencodez.simpleapi.servercomm.global.GlobalMessageProxyHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler;
-import com.bencodez.simpleapi.servercomm.mqtt.MqttHandler.MessageHandler;
+import com.bencodez.simpleapi.servercomm.mqtt.MessageHandler;
 import com.bencodez.simpleapi.servercomm.mqtt.MqttServerComm;
 import com.bencodez.simpleapi.servercomm.mysql.ProxyMessenger;
 import com.bencodez.simpleapi.servercomm.postgresql.PostgresProxyMessenger;
